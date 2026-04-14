@@ -5,6 +5,7 @@ from google_auth import worksheet
 import base64
 import random
 
+# --- Function for autoplay audio ---
 def autoplay_audio(file_path):
     with open(file_path, "rb") as f:
         data = f.read()
@@ -23,12 +24,33 @@ df = pd.DataFrame(data)
 # --- App title ---
 st.title("Class Mood Check-In")
 
+# --- Initialize session state ---
+if "student_id" not in st.session_state:
+    st.session_state.student_id = ""
+
+if "name" not in st.session_state:
+    st.session_state.name = ""
+
+if "mood" not in st.session_state:
+    st.session_state.mood = "Happy 😊"
+
+if "last_quote" not in st.session_state:
+    st.session_state.last_quote = None
+
+if "last_audio" not in st.session_state:
+    st.session_state.last_audio = None
+
+if "last_success" not in st.session_state:
+    st.session_state.last_success = False
+
 # --- Student input ---
-name = st.text_input("Enter your name")
+student_id = st.text_input("Enter your student ID", key="student_id")
+name = st.text_input("Enter your name", key="name")
 
 mood = st.selectbox(
     "How are you feeling?",
-    ["Happy 😊", "Calm 😌", "Tired 😴", "Stressed 😣", "Sad 😔"]
+    ["Happy 😊", "Calm 😌", "Tired 😴", "Stressed 😣", "Sad 😔"],
+    key="mood"
 )
 
 # --- Audio mapping ---
@@ -131,40 +153,60 @@ quote_map = {
 
 # --- Submit logic ---
 if st.button("Submit"):
-    if name.strip() == "":
-        st.warning("Please enter your name")
+    if student_id.strip() == "" or name.strip() == "":
+        st.warning("Please enter both your student ID and your name.")
     else:
+        student_id_clean = student_id.strip()
         name_clean = name.strip().title()
         today_date = datetime.now().strftime("%Y-%m-%d")
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         duplicate = False
-        if not df.empty and "Timestamp" in df.columns and "Name" in df.columns:
+        if (
+            not df.empty
+            and "Timestamp" in df.columns
+            and "StudentID" in df.columns
+        ):
             df["Date"] = pd.to_datetime(df["Timestamp"], errors="coerce").dt.strftime("%Y-%m-%d")
-            duplicate = ((df["Name"] == name_clean) & (df["Date"] == today_date)).any()
+            duplicate = (
+                (df["StudentID"].astype(str).str.strip() == student_id_clean)
+                & (df["Date"] == today_date)
+            ).any()
 
         if duplicate:
-            st.error("You have already submitted today.")
+            st.error("This student ID has already submitted today.")
+            st.session_state.last_success = False
         else:
-            worksheet.append_row([name_clean, mood, timestamp])
-            st.success("Submitted successfully!")
+            worksheet.append_row([student_id_clean, name_clean, mood, timestamp])
 
-            # --- Random quote ---
-            quote = random.choice(quote_map[mood])
-            st.info(f"Quote for you: {quote}")
+            st.session_state.last_quote = random.choice(quote_map[mood])
+            st.session_state.last_audio = audio_map.get(mood)
+            st.session_state.last_success = True
 
-            # --- Mood audio ---
-            audio_file = audio_map.get(mood)
-            if audio_file:
-                autoplay_audio(audio_file)
-                with open(audio_file, "rb") as f:
-                    st.audio(f.read(), format="audio/mp3")
+            # Clear inputs
+            st.session_state.student_id = ""
+            st.session_state.name = ""
+            st.session_state.mood = "Happy 😊"
+
+            st.rerun()
+
+# --- Show success / quote / audio after rerun ---
+if st.session_state.last_success:
+    st.success("Submitted successfully!")
+
+    if st.session_state.last_quote:
+        st.info(f"Quote for you: {st.session_state.last_quote}")
+
+    if st.session_state.last_audio:
+        autoplay_audio(st.session_state.last_audio)
+        with open(st.session_state.last_audio, "rb") as f:
+            st.audio(f.read(), format="audio/mp3")
 
 # --- Reload updated data ---
 data = worksheet.get_all_records()
 df = pd.DataFrame(data)
 
-# --- Public summary only ---
+# --- Public summary ---
 st.subheader("Live Class Mood Summary")
 
 if not df.empty and "Mood" in df.columns:
@@ -173,3 +215,31 @@ if not df.empty and "Mood" in df.columns:
     st.write(f"Total submissions: {len(df)}")
 else:
     st.info("No mood data available yet.")
+
+# --- Support flag logic using StudentID ---
+st.subheader("Support Check")
+
+if not df.empty and "StudentID" in df.columns and "Mood" in df.columns:
+    flagged = []
+
+    for sid in df["StudentID"].dropna().astype(str).str.strip().unique():
+        student_data = df[df["StudentID"].astype(str).str.strip() == sid]
+
+        low_mood_count = student_data[
+            student_data["Mood"].isin(["Sad 😔", "Stressed 😣"])
+        ].shape[0]
+
+        if low_mood_count >= 3:
+            flagged.append(sid)
+
+    if flagged:
+        st.warning(
+            "Some students may need extra support. "
+            "CSUMB PGCC crisis support is available 24/7 at 831-582-3969. "
+            "Call or text 988 for the Suicide & Crisis Lifeline. "
+            "In an emergency, call 911."
+        )
+    else:
+        st.success("No support flags right now.")
+else:
+    st.info("Support check will appear once submissions are available.")
