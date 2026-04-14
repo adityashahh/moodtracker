@@ -7,18 +7,24 @@ from google_auth import worksheet
 data = worksheet.get_all_records()
 df = pd.DataFrame(data)
 
-# --- App title ---
 st.title("Class Mood Check-In")
 
-# --- Student input ---
 name = st.text_input("Enter your name")
 
 mood = st.selectbox(
     "How are you feeling?",
-    ["Happy", "Calm", "Tired", "Stressed", "Sad"]
+    ["Happy 😊", "Calm 😌", "Tired 😴", "Stressed 😣", "Sad 😔"]
 )
 
-# --- Submit logic ---
+# Map each mood to an audio file
+audio_map = {
+    "Happy 😊": "happy.mp3",
+    "Calm 😌": "calm.mp3",
+    "Tired 😴": "tired.mp3",
+    "Stressed 😣": "stressed.mp3",
+    "Sad 😔": "sad.mp3"
+}
+
 if st.button("Submit"):
     if name.strip() == "":
         st.warning("Please enter your name")
@@ -37,6 +43,13 @@ if st.button("Submit"):
         else:
             worksheet.append_row([name_clean, mood, timestamp])
             st.success("Submitted successfully!")
+
+            # Play mood-based audio
+            audio_file = audio_map.get(mood)
+            if audio_file:
+                with open(audio_file, "rb") as f:
+                    audio_bytes = f.read()
+                    st.audio(audio_bytes, format="audio/mp3")
 
 # --- Reload updated data ---
 data = worksheet.get_all_records()
