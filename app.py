@@ -24,16 +24,7 @@ df = pd.DataFrame(data)
 # --- App title ---
 st.title("Class Mood Check-In")
 
-# --- Initialize session state ---
-if "student_id" not in st.session_state:
-    st.session_state.student_id = ""
-
-if "name" not in st.session_state:
-    st.session_state.name = ""
-
-if "mood" not in st.session_state:
-    st.session_state.mood = "Happy 😊"
-
+# --- Session state for post-submit feedback only ---
 if "last_quote" not in st.session_state:
     st.session_state.last_quote = None
 
@@ -42,16 +33,6 @@ if "last_audio" not in st.session_state:
 
 if "last_success" not in st.session_state:
     st.session_state.last_success = False
-
-# --- Student input ---
-student_id = st.text_input("Enter your student ID", key="student_id")
-name = st.text_input("Enter your name", key="name")
-
-mood = st.selectbox(
-    "How are you feeling?",
-    ["Happy 😊", "Calm 😌", "Tired 😴", "Stressed 😣", "Sad 😔"],
-    key="mood"
-)
 
 # --- Audio mapping ---
 audio_map = {
@@ -151,10 +132,21 @@ quote_map = {
     ]
 }
 
+# --- Input form ---
+with st.form("mood_form", clear_on_submit=True):
+    student_id = st.text_input("Enter your student ID")
+    name = st.text_input("Enter your name")
+    mood = st.selectbox(
+        "How are you feeling?",
+        ["Happy 😊", "Calm 😌", "Tired 😴", "Stressed 😣", "Sad 😔"]
+    )
+    submitted = st.form_submit_button("Submit")
+
 # --- Submit logic ---
-if st.button("Submit"):
+if submitted:
     if student_id.strip() == "" or name.strip() == "":
         st.warning("Please enter both your student ID and your name.")
+        st.session_state.last_success = False
     else:
         student_id_clean = student_id.strip()
         name_clean = name.strip().title()
@@ -167,10 +159,14 @@ if st.button("Submit"):
             and "Timestamp" in df.columns
             and "StudentID" in df.columns
         ):
-            df["Date"] = pd.to_datetime(df["Timestamp"], errors="coerce").dt.strftime("%Y-%m-%d")
+            temp_df = df.copy()
+            temp_df["Date"] = pd.to_datetime(
+                temp_df["Timestamp"], errors="coerce"
+            ).dt.strftime("%Y-%m-%d")
+
             duplicate = (
-                (df["StudentID"].astype(str).str.strip() == student_id_clean)
-                & (df["Date"] == today_date)
+                (temp_df["StudentID"].astype(str).str.strip() == student_id_clean)
+                & (temp_df["Date"] == today_date)
             ).any()
 
         if duplicate:
@@ -182,12 +178,6 @@ if st.button("Submit"):
             st.session_state.last_quote = random.choice(quote_map[mood])
             st.session_state.last_audio = audio_map.get(mood)
             st.session_state.last_success = True
-
-            # Clear inputs
-            st.session_state.student_id = ""
-            st.session_state.name = ""
-            st.session_state.mood = "Happy 😊"
-
             st.rerun()
 
 # --- Show success / quote / audio after rerun ---
@@ -235,9 +225,8 @@ if not df.empty and "StudentID" in df.columns and "Mood" in df.columns:
     if flagged:
         st.warning(
             "Some students may need extra support. "
-            "CSUMB PGCC crisis support is available 24/7 at 831-582-3969. "
-            "Call or text 988 for the Suicide & Crisis Lifeline. "
-            "In an emergency, call 911."
+            "If you need help, please contact your campus support resources "
+            "or a crisis helpline immediately."
         )
     else:
         st.success("No support flags right now.")
