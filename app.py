@@ -2,13 +2,28 @@ import streamlit as st
 from datetime import datetime
 import pandas as pd
 from google_auth import worksheet
+import base64
+import random
+
+def autoplay_audio(file_path):
+    with open(file_path, "rb") as f:
+        data = f.read()
+        b64 = base64.b64encode(data).decode()
+        md = f"""
+        <audio autoplay>
+            <source src="data:audio/mp3;base64,{b64}" type="audio/mp3">
+        </audio>
+        """
+        st.markdown(md, unsafe_allow_html=True)
 
 # --- Load data from Google Sheet ---
 data = worksheet.get_all_records()
 df = pd.DataFrame(data)
 
+# --- App title ---
 st.title("Class Mood Check-In")
 
+# --- Student input ---
 name = st.text_input("Enter your name")
 
 mood = st.selectbox(
@@ -16,7 +31,7 @@ mood = st.selectbox(
     ["Happy 😊", "Calm 😌", "Tired 😴", "Stressed 😣", "Sad 😔"]
 )
 
-# Map each mood to an audio file
+# --- Audio mapping ---
 audio_map = {
     "Happy 😊": "happy.mp3",
     "Calm 😌": "calm.mp3",
@@ -25,6 +40,96 @@ audio_map = {
     "Sad 😔": "sad.mp3"
 }
 
+# --- Quote mapping ---
+quote_map = {
+    "Happy 😊": [
+        "Keep shining. Your energy can lift the whole room.",
+        "Joy is powerful. Carry it with confidence today.",
+        "A good mood can spark great ideas.",
+        "Your positivity matters more than you think.",
+        "Bring that bright energy into everything you do today.",
+        "Happy minds often notice beautiful possibilities.",
+        "You are allowed to enjoy this moment fully.",
+        "Let your good energy guide your learning today.",
+        "A cheerful heart creates space for growth.",
+        "Keep smiling. It might help someone else smile too.",
+        "Positive energy is contagious. Share it well.",
+        "Today is a good day to make progress.",
+        "Your happiness is a strength, not a distraction.",
+        "Hold onto this feeling and let it support your work.",
+        "Enjoy the good mood. You earned it."
+    ],
+    "Calm 😌": [
+        "A calm mind helps you learn with clarity.",
+        "Peace creates space for strong thinking.",
+        "Stillness can be a quiet kind of strength.",
+        "Calm energy helps steady the day ahead.",
+        "A peaceful start can shape a productive day.",
+        "You do not have to rush to do well.",
+        "A centered mind can handle a lot.",
+        "Breathe deeply. You are in a good place to begin.",
+        "Calmness is not weakness. It is control.",
+        "A steady mind makes room for better decisions.",
+        "You are grounded, and that is powerful.",
+        "Sometimes the strongest energy is calm energy.",
+        "Quiet confidence can take you far today.",
+        "When your mind is calm, your focus grows stronger.",
+        "Let today unfold one clear step at a time."
+    ],
+    "Tired 😴": [
+        "Small steps still count. Keep going gently.",
+        "It is okay to feel tired. Progress can still happen.",
+        "You do not need to be at 100 percent to do something meaningful.",
+        "Take it one task at a time. That is enough.",
+        "Rested or not, you are still capable.",
+        "Tired does not mean failing. It means you are human.",
+        "Give yourself patience as well as effort today.",
+        "Even slow progress is progress.",
+        "A little focus can still go a long way.",
+        "Be kind to yourself while you move through the day.",
+        "You can do hard things, even on low energy.",
+        "Today may call for gentleness, not perfection.",
+        "One good step is enough for now.",
+        "Keep showing up. That matters.",
+        "Your effort still counts, even when you are tired."
+    ],
+    "Stressed 😣": [
+        "Take one breath, then one task, then the next.",
+        "You do not have to solve everything at once.",
+        "Pause. Breathe. Begin again.",
+        "Stress is real, but it does not define your ability.",
+        "Focus on what is in front of you right now.",
+        "One calm moment can reset a stressful day.",
+        "You are stronger than this moment feels.",
+        "Break the day into smaller pieces and keep moving.",
+        "You can handle this step by step.",
+        "It is okay to slow down and regroup.",
+        "Pressure can be managed one breath at a time.",
+        "Your worth is not measured by your stress.",
+        "Let progress be enough today.",
+        "You are not alone in difficult moments.",
+        "Take the next small step. That is how things get easier."
+    ],
+    "Sad 😔": [
+        "It is okay to have a heavy day. Be gentle with yourself.",
+        "You do not have to hide your hard moments.",
+        "Sad days still pass, and better ones can follow.",
+        "Give yourself kindness before asking for strength.",
+        "You are allowed to feel this without apology.",
+        "A difficult feeling does not make you weak.",
+        "Take care of yourself in small ways today.",
+        "Even on hard days, your presence matters.",
+        "You deserve patience, compassion, and support.",
+        "There is no shame in feeling low sometimes.",
+        "One quiet moment of care can help more than you think.",
+        "You are still valuable on your hardest days.",
+        "Healing often begins with honesty.",
+        "Let today be soft if it needs to be.",
+        "Better moments can still come."
+    ]
+}
+
+# --- Submit logic ---
 if st.button("Submit"):
     if name.strip() == "":
         st.warning("Please enter your name")
@@ -44,12 +149,16 @@ if st.button("Submit"):
             worksheet.append_row([name_clean, mood, timestamp])
             st.success("Submitted successfully!")
 
-            # Play mood-based audio
+            # --- Random quote ---
+            quote = random.choice(quote_map[mood])
+            st.info(f"Quote for you: {quote}")
+
+            # --- Mood audio ---
             audio_file = audio_map.get(mood)
             if audio_file:
+                autoplay_audio(audio_file)
                 with open(audio_file, "rb") as f:
-                    audio_bytes = f.read()
-                    st.audio(audio_bytes, format="audio/mp3")
+                    st.audio(f.read(), format="audio/mp3")
 
 # --- Reload updated data ---
 data = worksheet.get_all_records()
